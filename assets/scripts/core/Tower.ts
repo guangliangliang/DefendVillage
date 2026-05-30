@@ -1,7 +1,7 @@
 import { _decorator, Component, Graphics, Layers, Node, UITransform, Vec3 } from 'cc';
 import { TowerConfig, TowerId, TowerLevelStats } from '../config/GameTypes';
 import { Enemy } from './Enemy';
-import { addCenteredLabel, createUiNode, drawRect, hexColor } from './NodeFactory';
+import { createSpriteNode, hexColor } from './NodeFactory';
 
 const { ccclass } = _decorator;
 
@@ -81,13 +81,9 @@ export class Tower extends Component {
   private redraw(): void {
     this.node.destroyAllChildren();
 
-    const bodySize = 34 + this.levelIndex * 4;
-    drawRect(this.node, bodySize, bodySize, this.config.color, '#2f241f', 10);
-
-    const nameNode = createUiNode('Name', 90, 20);
-    nameNode.setParent(this.node);
-    nameNode.setPosition(0, 32);
-    addCenteredLabel(nameNode, `${this.config.name} L${this.levelIndex + 1}`, 12);
+    const bodySize = 64 + this.levelIndex * 6;
+    const spriteNode = createSpriteNode('TowerSprite', bodySize, bodySize, `carrot/sprites/towers/${this.config.id}`);
+    spriteNode.setParent(this.node);
 
     const ringNode = new Node('RangeRing');
     ringNode.layer = Layers.Enum.UI_2D;

@@ -1,6 +1,6 @@
-import { _decorator, Component, Graphics, Label, Layers, UITransform, Vec3 } from 'cc';
+import { _decorator, Component, Graphics, Layers, Node, UITransform, Vec3 } from 'cc';
 import { EnemyConfig } from '../config/GameTypes';
-import { addCenteredLabel, createUiNode, drawCircle, hexColor } from './NodeFactory';
+import { createSpriteNode, createUiNode, hexColor } from './NodeFactory';
 
 const { ccclass } = _decorator;
 
@@ -17,7 +17,8 @@ export class Enemy extends Component {
 
   private hpBar!: Graphics;
   private hpBarBg!: Graphics;
-  private label!: Label;
+  private hpBarNode!: Node;
+  private hpVisibleTimer = 0;
   private onDeathCallback!: (enemy: Enemy) => void;
   private onEscapeCallback!: (enemy: Enemy) => void;
 
@@ -36,16 +37,15 @@ export class Enemy extends Component {
     this.currentPathIndex = 0;
 
     this.node.setPosition(path[0]);
-    drawCircle(this.node, config.size, config.color, '#2c1c13');
-
-    const titleNode = createUiNode('Title', 64, 20);
-    titleNode.setParent(this.node);
-    titleNode.setPosition(0, config.size + 18);
-    this.label = addCenteredLabel(titleNode, config.name, 14);
+    const spriteSize = config.size * (config.id === 'chief' ? 4.2 : 3.4);
+    const spriteNode = createSpriteNode('EnemySprite', spriteSize, spriteSize, `carrot/sprites/enemies/${config.id}`);
+    spriteNode.setParent(this.node);
 
     const hpBgNode = createUiNode('HpBg', 52, 8);
     hpBgNode.setParent(this.node);
-    hpBgNode.setPosition(0, config.size + 4);
+    hpBgNode.setPosition(0, spriteSize * 0.42);
+    hpBgNode.active = false;
+    this.hpBarNode = hpBgNode;
     this.hpBarBg = hpBgNode.addComponent(Graphics);
     this.hpBarBg.fillColor = hexColor('#2c1c13');
     this.hpBarBg.roundRect(-26, -4, 52, 8, 3);
@@ -62,6 +62,13 @@ export class Enemy extends Component {
   update(dt: number): void {
     if (this.isDead || this.hasEscaped || this.path.length <= 1) {
       return;
+    }
+
+    if (this.hpVisibleTimer > 0) {
+      this.hpVisibleTimer -= dt;
+      if (this.hpVisibleTimer <= 0 && this.hpBarNode) {
+        this.hpBarNode.active = false;
+      }
     }
 
     if (this.slowTimer > 0) {
@@ -102,6 +109,8 @@ export class Enemy extends Component {
     }
 
     this.hp -= amount;
+    this.hpVisibleTimer = 1.2;
+    this.hpBarNode.active = true;
     this.refreshHpBar();
     if (this.hp <= 0) {
       this.die();

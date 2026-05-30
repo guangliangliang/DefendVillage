@@ -1,6 +1,6 @@
 import { _decorator, Component, Label, Node } from 'cc';
 import { BuildAction } from '../config/GameTypes';
-import { addCenteredLabel, createUiNode, drawRect } from '../core/NodeFactory';
+import { addCenteredLabel, createSpriteNode, createUiNode, drawRect } from '../core/NodeFactory';
 
 const { ccclass } = _decorator;
 
@@ -10,76 +10,103 @@ export interface HudController {
 
 @ccclass('BattleHUD')
 export class BattleHUD extends Component {
-  private goldLabel = createUiNode('GoldLabel', 180, 30);
-  private livesLabel = createUiNode('LivesLabel', 180, 30);
-  private waveLabel = createUiNode('WaveLabel', 220, 30);
-  private hintLabel = createUiNode('HintLabel', 560, 36);
-  private controller!: HudController;
-  private goldText!: Label;
-  private livesText!: Label;
-  private waveText!: Label;
-  private hintText!: Label;
+  private moneyDigits = new Node('MoneyDigits');
+  private waveYellowDigits = new Node('WaveYellowDigits');
+  private waveWhiteDigits = new Node('WaveWhiteDigits');
+  private lifeAnchor = new Node('LifeAnchor');
+  private messagePanel = createUiNode('MessagePanel', 520, 72);
+  private messageText!: Label;
+  private lastLives = -1;
 
-  initialize(controller: HudController): void {
-    this.controller = controller;
+  initialize(_controller: HudController): void {
     this.buildLayout();
   }
 
   setStats(gold: number, lives: number, wave: number, totalWaves: number): void {
-    this.goldText.string = `Gold: ${gold}`;
-    this.livesText.string = `Village: ${lives}`;
-    this.waveText.string = `Wave: ${wave}/${totalWaves}`;
+    this.renderDigits(this.moneyDigits, Math.max(0, gold).toString(), 'white', 30, 24);
+    const waveText = Math.max(1, wave) < 10 ? `0${Math.max(1, wave)}` : Math.max(1, wave).toString();
+    this.renderDigits(this.waveYellowDigits, waveText, 'yellow', 36, 45);
+    this.renderDigits(this.waveWhiteDigits, Math.max(totalWaves, 15).toString(), 'white', 30, 22);
+    this.updateLife(lives);
   }
 
-  setHint(text: string): void {
-    this.hintText.string = text;
+  setHint(_text: string): void {
   }
 
   showEndState(victory: boolean): void {
-    this.setHint(victory ? 'Victory! The village survived.' : 'Defeat. The village fell.');
+    this.messagePanel.active = true;
+    this.messageText.string = victory ? 'Victory' : 'Defeat';
   }
 
   private buildLayout(): void {
     this.node.destroyAllChildren();
 
-    const topBar = createUiNode('TopBar', 1180, 64);
+    const topBar = createSpriteNode('MenuBar', 960, 80, 'carrot/battle/menu_bg');
     topBar.setParent(this.node);
-    topBar.setPosition(0, 315);
-    drawRect(topBar, 1180, 64, '#2a221f', '#8c775f', 14);
+    topBar.setPosition(this.sourceX(480), this.sourceY(600));
 
-    this.goldLabel.setParent(topBar);
-    this.goldLabel.setPosition(-420, 0);
-    this.goldText = addCenteredLabel(this.goldLabel, 'Gold: 0', 24);
+    const centerPanel = createSpriteNode('WavePanel', 300, 80, 'carrot/battle/hud_center');
+    centerPanel.setParent(this.node);
+    centerPanel.setPosition(this.sourceX(480), this.sourceY(600));
 
-    this.livesLabel.setParent(topBar);
-    this.livesLabel.setPosition(-190, 0);
-    this.livesText = addCenteredLabel(this.livesLabel, 'Village: 0', 24);
+    const speedButton = createSpriteNode('SpeedButton', 110, 80, 'carrot/battle/speed11');
+    speedButton.setParent(this.node);
+    speedButton.setPosition(this.sourceX(680), this.sourceY(600));
 
-    this.waveLabel.setParent(topBar);
-    this.waveLabel.setPosition(90, 0);
-    this.waveText = addCenteredLabel(this.waveLabel, 'Wave: 0/0', 24);
+    const pauseButton = createSpriteNode('PauseButton', 60, 80, 'carrot/battle/pause01');
+    pauseButton.setParent(this.node);
+    pauseButton.setPosition(this.sourceX(790), this.sourceY(600));
 
-    this.hintLabel.setParent(this.node);
-    this.hintLabel.setPosition(0, 270);
-    drawRect(this.hintLabel, 560, 36, '#4d3d34', '#9f8a70', 10);
-    this.hintText = addCenteredLabel(this.hintLabel, 'Choose a tower, then tap a build tile.', 18);
+    const menuButton = createSpriteNode('MenuButton', 60, 80, 'carrot/battle/menu01');
+    menuButton.setParent(this.node);
+    menuButton.setPosition(this.sourceX(870), this.sourceY(600));
 
-    const actions: Array<{ label: string; action: BuildAction; color: string; x: number }> = [
-      { label: 'Arrow', action: 'arrow', color: '#9a6a3f', x: -270 },
-      { label: 'Cannon', action: 'cannon', color: '#7e5940', x: -90 },
-      { label: 'Frost', action: 'frost', color: '#4b8fa8', x: 90 },
-      { label: 'Sell', action: 'sell', color: '#8d3d3d', x: 270 },
-    ];
+    this.moneyDigits.setParent(this.node);
+    this.moneyDigits.setPosition(this.sourceX(138), this.sourceY(610));
 
-    for (const item of actions) {
-      const button = createUiNode(`${item.label}Button`, 150, 56);
-      button.setParent(this.node);
-      button.setPosition(item.x, -316);
-      drawRect(button, 150, 56, item.color, '#f2dfc4', 14);
-      addCenteredLabel(button, item.label, 22);
-      button.on(Node.EventType.TOUCH_END, () => {
-        this.controller.onSelectAction(item.action);
-      });
+    this.waveYellowDigits.setParent(this.node);
+    this.waveYellowDigits.setPosition(this.sourceX(377), this.sourceY(607));
+
+    this.waveWhiteDigits.setParent(this.node);
+    this.waveWhiteDigits.setPosition(this.sourceX(480), this.sourceY(608));
+
+    this.lifeAnchor.setParent(this.node);
+    this.lifeAnchor.setPosition(this.sourceX(919), this.sourceY(475));
+
+    this.messagePanel.setParent(this.node);
+    this.messagePanel.setPosition(0, 0);
+    drawRect(this.messagePanel, 520, 72, '#123f52', '#bdf4ff', 18);
+    this.messageText = addCenteredLabel(this.messagePanel, '', 36, '#fff6b8');
+    this.messagePanel.active = false;
+  }
+
+  private renderDigits(parent: Node, value: string, color: 'white' | 'yellow', digitHeight: number, spacing: number): void {
+    parent.destroyAllChildren();
+    for (let index = 0; index < value.length; index += 1) {
+      const digit = value[index];
+      const node = createSpriteNode(`Digit-${color}-${digit}-${index}`, Math.round(digitHeight * 0.76), digitHeight, `carrot/battle/digits/${color}_${digit}`);
+      node.setParent(parent);
+      node.setPosition(index * spacing, 0);
     }
+  }
+
+  private updateLife(lives: number): void {
+    const clampedLives = Math.min(10, Math.max(1, Math.floor(lives)));
+    if (clampedLives === this.lastLives) {
+      return;
+    }
+
+    this.lastLives = clampedLives;
+    this.lifeAnchor.destroyAllChildren();
+    const badge = createSpriteNode(`Life-${clampedLives}`, 80, 40, `carrot/battle/life_${clampedLives}`);
+    badge.setParent(this.lifeAnchor);
+  }
+
+  private sourceX(value: number): number {
+    return value - 480;
+  }
+
+  private sourceY(value: number): number {
+    return value - 320;
   }
 }

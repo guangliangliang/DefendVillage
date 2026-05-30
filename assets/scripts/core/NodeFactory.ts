@@ -6,8 +6,11 @@ import {
   Layers,
   Node,
   Size,
+  Sprite,
+  SpriteFrame,
   UITransform,
   VerticalTextAlignment,
+  resources,
 } from 'cc';
 
 export function hexColor(hex: string): Color {
@@ -23,6 +26,22 @@ export function createUiNode(name: string, width: number, height: number): Node 
   node.layer = Layers.Enum.UI_2D;
   const transform = node.addComponent(UITransform);
   transform.setContentSize(new Size(width, height));
+  return node;
+}
+
+export function createSpriteNode(name: string, width: number, height: number, resourcePath: string): Node {
+  const node = createUiNode(name, width, height);
+  const sprite = node.addComponent(Sprite);
+  sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+
+  resources.load(`${resourcePath}/spriteFrame`, SpriteFrame, (error, spriteFrame) => {
+    if (error || !spriteFrame || !node.isValid) {
+      return;
+    }
+
+    sprite.spriteFrame = spriteFrame;
+  });
+
   return node;
 }
 
